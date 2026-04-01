@@ -24,7 +24,7 @@ with st.sidebar:
         st.markdown("""
         1. **Paste URL**: Enter any YouTube video link.
         2. **Extract**: We fetch the transcript and metadata.
-        3. **Analyze**: Gemini 1.5 Flash processes the text.
+        3. **Analyze**: Gemini 2.5 Flash processes the text.
         4. **Insights**: Get a summary and audience mood analysis instantly!
         """)
         
@@ -65,7 +65,7 @@ if summarize_button:
             with st.spinner("✨ Analyzing video content... Hang tight!"):
                 transcript = get_video_transcript(video_id)
                 
-                if transcript.startswith("Error:"):
+                if transcript.startswith("Error:") or transcript.startswith("System Error"):
                     st.error(f"Failed to fetch transcript: {transcript}")
                 else:
                     summary, sentiment_score = get_summarization_and_sentiment(transcript, api_key)
@@ -128,4 +128,4 @@ if summarize_button:
 
 # Footer
 st.markdown("---")
-st.markdown("<div style='text-align:center; color:#666;'>Powered by Google Gemini 1.5 Flash • Built with Streamlit</div>", unsafe_allow_html=True)
+st.markdown("<div style='text-align:center; color:#666;'>Powered by Google Gemini 2.5 Flash • Built with Streamlit</div>", unsafe_allow_html=True)

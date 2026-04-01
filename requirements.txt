@@ -3,3 +3,4 @@ plotly
 google-generativeai
 langchain-text-splitters
 yt-dlp
+youtube-transcript-api
