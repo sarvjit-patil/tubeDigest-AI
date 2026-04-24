@@ -89,6 +89,37 @@ def get_video_transcript(video_id):
                 elif "VideoUnavailable" in str(type(inner_e)):
                     return "System Error: The video is unavailable or private."
                 else:
+                    print("youtube_transcript_api failed. Falling back to yt-dlp...")
+                    try:
+                        ydl_opts = {
+                            'skip_download': True,
+                            'writesubtitles': True,
+                            'writeautomaticsub': True,
+                            'subtitleslangs': ['hi', 'mr', 'en'],
+                            'quiet': True,
+                            'no_warnings': True
+                        }
+                        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                            info = ydl.extract_info(video_id, download=False)
+                            subs = info.get('subtitles', {})
+                            auto_subs = info.get('automatic_captions', {})
+                            
+                            for lang in ['hi', 'mr', 'en']:
+                                formats = subs.get(lang) or auto_subs.get(lang)
+                                if formats:
+                                    json3_format = next((f for f in formats if f['ext'] == 'json3'), None)
+                                    if json3_format:
+                                        req = urllib.request.Request(json3_format['url'], headers={'User-Agent': 'Mozilla/5.0'})
+                                        resp = urllib.request.urlopen(req)
+                                        data = json.loads(resp.read())
+                                        text_pieces = [seg.get('utf8', '') for event in data.get('events', []) for seg in event.get('segs', [])]
+                                        if text_pieces:
+                                            transcript_text = " ".join(text_pieces)
+                                            transcript_text = re.sub(r'\s+', ' ', transcript_text).strip()
+                                            return transcript_text
+                    except Exception as ydl_e:
+                        print(f"yt-dlp fallback also failed: {ydl_e}")
+                        
                     return f"System Error: Could not retrieve transcript. Reason: {type(inner_e).__name__}.\nDetails: {traceback.format_exc()}"
                 
         # Join all the text pieces
