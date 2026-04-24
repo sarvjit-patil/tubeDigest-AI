@@ -1,6 +1,6 @@
 # TubeDigest AI ✨
 
-TubeDigest AI is a powerful, elegant YouTube video summarization and sentiment analysis tool. Built with Streamlit and powered by Google Gemini 2.5 Flash, it allows users to paste any YouTube video URL and instantly receive a comprehensive summary of the content along with an analysis of the audience's mood.
+TubeDigest AI is a powerful, elegant YouTube video summarization and sentiment analysis tool. Built with Streamlit and powered by Groq API (Llama 3.1), it allows users to paste any YouTube video URL and instantly receive a comprehensive summary of the content along with an analysis of the audience's mood.
 
 ## 🚀 Features
 
