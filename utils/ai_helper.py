@@ -1,72 +1,51 @@
-import google.generativeai as genai
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 import streamlit as st
+from groq import Groq
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 import time
+import re
 
 def get_summarization_and_sentiment(transcript, api_key):
     """
-    Summarizes the transcript and performs sentiment analysis using Gemini models.
-    Automatically falls back to older/alternative models if quota is exceeded.
+    Summarizes the transcript and performs sentiment analysis using Groq models.
     """
     if not api_key:
-        return "Error: Gemini API Key is missing.", None
+        return "Error: Groq API Key is missing.", None
 
-    genai.configure(api_key=api_key)
-    
     try:
-        available_models = [m.name.replace('models/', '') for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        
-        # Priority list of models to try
-        preferred_models = [
-            'gemini-2.5-flash',
-            'gemini-1.5-flash', 
-            'gemini-1.5-flash-latest', 
-            'gemini-1.5-pro', 
-            'gemini-pro'
-        ]
-        
-        # Filter to only models the key actually has access to
-        models_to_try = [m for m in preferred_models if m in available_models]
-        if not models_to_try and available_models:
-            models_to_try = [available_models[0]] # absolute fallback
-            
-        if not models_to_try:
-            return "Error: No text generation models available for this API key.", None
-
+        client = Groq(api_key=api_key)
     except Exception as e:
-        return f"Error initializing Gemini API: {str(e)}", None
+        return f"Error initializing Groq API: {str(e)}", None
 
-    # Split text if it's too long
-    # Gemini models have a large context window (>1M tokens), using 300k chars to minimize API calls
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=300000, chunk_overlap=5000)
+    model_name = "llama-3.1-8b-instant"
+    
+    # Groq Free Tier limits you to 6,000 Tokens Per Minute (TPM).
+    # 18,000 characters is roughly 4,500 tokens. 
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=18000, chunk_overlap=1000)
     chunks = text_splitter.split_text(transcript)
 
-    # Helper function to try generating content across available models
-    def generate_with_fallback(prompt):
-        last_error = None
-        for model_name in models_to_try:
-            try:
-                model = genai.GenerativeModel(model_name)
-                response = model.generate_content(prompt)
-                return response.text
-            except Exception as e:
-                error_msg = str(e)
-                last_error = error_msg
-                # If it's a quota/rate limit error, try the next model
-                if "429" in error_msg or "Quota" in error_msg or "exhausted" in error_msg.lower():
-                    time.sleep(2) # Brief pause before trying fallback model
-                    continue
-                else:
-                    # For other types of errors (e.g. safety blocks), don't fallback, just fail
-                    raise Exception(f"API Error ({model_name}): {error_msg}")
-        
-        # If we exhausted all models because of quota
-        raise Exception(f"All available models have exceeded their daily/minute quota limits. Please check your Google AI Studio billing. Last error: {last_error}")
+    def generate_content(prompt):
+        try:
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": "You are a helpful AI assistant that provides accurate summaries and analysis."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.5,
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            raise Exception(f"Groq API Error: {str(e)}")
 
     combined_summary = ""
+    
+    if len(chunks) > 1:
+        st.warning(f"⚠️ Long video detected! Groq's Free Tier limits us to 6,000 tokens per minute. We have to process this in {len(chunks)} chunks and wait 60 seconds between each to avoid crashing.")
+
     for i, chunk in enumerate(chunks):
         if i > 0:
-            time.sleep(10) # Avoid hitting minute limits if we are chunking (rare)
+            with st.spinner(f"Waiting 60 seconds to bypass Groq free tier limits (Chunk {i+1}/{len(chunks)})..."):
+                time.sleep(61) # Wait out the 1-minute TPM limit
             
         prompt = f"""
         Summarize the following YouTube video transcript into concise bullet points. 
@@ -76,14 +55,19 @@ def get_summarization_and_sentiment(transcript, api_key):
         {chunk}
         """
         try:
-            text = generate_with_fallback(prompt)
+            text = generate_content(prompt)
             combined_summary += text + "\n"
         except Exception as e:
+            # If we STILL hit the rate limit, fallback to returning what we have so far
+            if 'rate_limit_exceeded' in str(e).lower() and combined_summary:
+                st.error("Hit strict Groq rate limit. Returning partial summary of the video.")
+                break
             return f"Error during summarization: {str(e)}", None
 
     # Final Summary for long videos
-    if len(chunks) > 1:
-        time.sleep(5)
+    if len(chunks) > 1 and combined_summary:
+        with st.spinner("Waiting 60 seconds before final consolidation..."):
+            time.sleep(61)
         final_prompt = f"""
         Consolidate the following summaries into a single, high-quality, professional bulleted summary.
         
@@ -91,7 +75,7 @@ def get_summarization_and_sentiment(transcript, api_key):
         {combined_summary}
         """
         try:
-            final_summary = generate_with_fallback(final_prompt)
+            final_summary = generate_content(final_prompt)
         except Exception as e:
             return f"Error during consolidation: {str(e)}", None
     else:
@@ -106,11 +90,17 @@ def get_summarization_and_sentiment(transcript, api_key):
     {final_summary}
     """
     try:
-        sentiment_text = generate_with_fallback(sentiment_prompt)
-        try:
-            sentiment_score = float(sentiment_text.strip())
-        except:
-            sentiment_score = 50.0 # Default
+        time.sleep(1)
+        sentiment_text = generate_content(sentiment_prompt)
+        # Extract just the number in case the model is chatty
+        match = re.search(r'\d+', sentiment_text)
+        if match:
+            sentiment_score = float(match.group())
+        else:
+            sentiment_score = 50.0
+            
+        # cap score bounds
+        sentiment_score = max(0.0, min(100.0, sentiment_score))
     except Exception as e:
         sentiment_score = 50.0
 
