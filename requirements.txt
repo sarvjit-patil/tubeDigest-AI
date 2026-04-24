@@ -1,6 +1,6 @@
 streamlit
 plotly
-google-generativeai
+groq
 langchain-text-splitters
 yt-dlp
 youtube-transcript-api

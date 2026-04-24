@@ -24,7 +24,7 @@ with st.sidebar:
         st.markdown("""
         1. **Paste URL**: Enter any YouTube video link.
         2. **Extract**: We fetch the transcript and metadata.
-        3. **Analyze**: Gemini 2.5 Flash processes the text.
+        3. **Analyze**: Groq (Llama 3) processes the text.
         4. **Insights**: Get a summary and audience mood analysis instantly!
         """)
         
@@ -37,7 +37,7 @@ with st.sidebar:
     """)
     
     # API Key Input
-    api_key = st.text_input("Enter Gemini API Key", type="password", help="Get yours at https://aistudio.google.com/")
+    api_key = st.text_input("Enter Groq API Key", type="password", help="Get yours at https://console.groq.com/")
 
 # Header Section
 st.markdown("<div class='main-title'>TubeDigest AI ✨</div>", unsafe_allow_html=True)
@@ -47,7 +47,7 @@ st.markdown("<div class='sub-title'>Elevate your YouTube experience with profess
 with st.container():
     col_input, col_btn = st.columns([4, 1])
     with col_input:
-        video_url = st.text_input("", placeholder="Enter YouTube URL (e.g., https://www.youtube.com/watch?v=...)")
+        video_url = st.text_input("YouTube Video URL", placeholder="Enter YouTube URL (e.g., https://www.youtube.com/watch?v=...)", label_visibility="collapsed")
     with col_btn:
         st.markdown("<div style='margin-top:25px;'></div>", unsafe_allow_html=True)
         summarize_button = st.button("Summarize Now")
@@ -56,7 +56,7 @@ if summarize_button:
     if not video_url:
         st.error("Please provide a valid YouTube URL.")
     elif not api_key:
-        st.warning("Please enter your Gemini API Key in the sidebar.")
+        st.warning("Please enter your Groq API Key in the sidebar.")
     else:
         video_id = extract_video_id(video_url)
         if not video_id:
@@ -128,4 +128,4 @@ if summarize_button:
 
 # Footer
 st.markdown("---")
-st.markdown("<div style='text-align:center; color:#666;'>Powered by Google Gemini 2.5 Flash • Built with Streamlit</div>", unsafe_allow_html=True)
+st.markdown("<div style='text-align:center; color:#666;'>Powered by Groq (Llama 3) • Built with Streamlit</div>", unsafe_allow_html=True)
